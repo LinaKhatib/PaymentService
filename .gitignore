@@ -1,0 +1,39 @@
+# Rider / JetBrains
+.idea/
+*.sln.iml
+*.user
+*.suo
+*.dbmdl
+*.cache
+*.log
+
+# Build results
+bin/
+obj/
+publish/
+packages/
+*.dll
+*.pdb
+*.exe
+
+# User settings
+appsettings.Development.json
+secrets.json
+*.userprefs
+
+# Visual Studio
+.vs/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Docker
+*.pid
+*.pid.lock
+
+# Logs
+logs/
+*.log
