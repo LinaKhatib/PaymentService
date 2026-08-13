@@ -14,4 +14,5 @@ public class Event
     public DateTime OccurredAt { get; set; }
     
     public string OperationId { get; set; } = string.Empty;
+    public Operation Operation { get; set; } = new();
 }
