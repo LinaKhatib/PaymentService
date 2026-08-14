@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using TransactionService.Data;
+using TransactionService.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -7,8 +8,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-builder.Services.AddDbContext<PaymentDbContext>(options =>
-    options.UseSqlite(builder.Configuration.GetConnectionString("DefaultConnection")));
+builder.Services.AddDataAccess(builder.Configuration);
+
+
+
 
 var app = builder.Build();
 
