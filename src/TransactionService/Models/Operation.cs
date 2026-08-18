@@ -12,4 +12,5 @@ public class Operation
     public string? ProviderPaymentId { get; set; } = null;
     
     public List<Event> Events { get; set; } = new();
+    public int EventCount { get; set; }
 }

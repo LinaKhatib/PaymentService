@@ -41,8 +41,14 @@ class EventsConfiguration : IEntityTypeConfiguration<Event>
 {
     public void Configure(EntityTypeBuilder<Event> builder)
     {
-        builder.HasKey(e => e.EventId);
+        builder.HasKey(e => e.Id);
 
+        builder.Property(e => e.Id)
+            .ValueGeneratedOnAdd();
+         
+        builder.HasIndex(e => new { e.OperationId, e.EventId })
+            .IsUnique();
+        
         builder.Property(e => e.Message)
             .HasMaxLength(500);
     }
