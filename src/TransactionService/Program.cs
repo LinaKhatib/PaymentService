@@ -13,6 +13,15 @@ builder.Services.AddDataAccess(builder.Configuration);
 
 builder.Services.AddApplicationServices();
 
+builder.Services.AddHttpClient<IProviderService, ProviderService>(client =>
+{
+    var providerUrl = Environment.GetEnvironmentVariable("PROVIDER_URL") ?? "http://localhost:8081";
+    client.BaseAddress = new Uri(providerUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+    
+    client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
+});
+
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
@@ -28,7 +37,9 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 
-// Тестовые эндпонты
+// Тестовые 
+
+app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.MapPost("/operations", async (OperationRequest request, IOperationService service, ILogger<Program> logger) =>
 {
@@ -110,5 +121,7 @@ app.MapGet("/operations/{id}/events", async (string id, IEventService? service, 
         return Results.Problem("При получении событий произошла ошибка");
     }
 });
+
+
 
 app.Run();
