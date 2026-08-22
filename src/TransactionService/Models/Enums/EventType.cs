@@ -5,12 +5,14 @@ public enum EventType
     // сервесные
     CREATED,   // транзакция создана
     SUBMIT_ATTEMPT,   // запланирована отправка провайдеру
-    PROVIDER_TIMEOUT,   // таймайт ответа от провайдера
+    PROVIDER_REQUEST,   // отправка запроса провайдеру
+    PROVIDER_TIMEOUT,   // таймаут ожидания ответа от провайдера
     
-    // после http-ответа от провайдера
+    // после http-запроса к провайдеру
     PROVIDER_RESPONSE_RECEIVED,   // успешный ответ от провайдера 
     PROVIDER_SERVICE_UNAVAILABLE,   // ошибка от провайдера (503)
     PROVIDER_NETWORK_ERROR,   // сетевая ошибка от провайдера
+    PROVIDER_UNKNOWN_ERROR,   // неизвестная ошибка
     LATE_PROVIDER_RESPONSE_RECEIVED,   // поздний ответ от провайдера (после callback) с совпадающим ID 
     LATE_PROVIDER_RESPONSE_IGNORED,   // поздний ответ от провайдера (после callback) с несовпадающим ID
     

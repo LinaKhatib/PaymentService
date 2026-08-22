@@ -5,7 +5,7 @@ using TransactionService.Models.Enums;
 
 namespace TransactionService.Services;
 
-public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, IProviderService providerService, ILogger<OperationService> logger) : IOperationService
+public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, /*IProviderService providerService,*/ ILogger<OperationService> logger) : IOperationService
 {
     public async Task<OperationResponse> CreateOperationAsync(OperationRequest request)
     {
@@ -75,21 +75,6 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         };
         await eventRepository.AddEventAsync(newEvent);
         logger.LogInformation("--- Событие создано для операции {OperationId}: {EventType}. А операция переведена в статус {OperationStatus}", operation.OperationId, newEvent.Type, operation.Status);
-
-        try
-        {
-            var providerResponse = await providerService.SendPaymentAsync(operation.OperationId, operation.Amount, operation.Currency);
-            logger.LogInformation("--- Запрос провайдеру на создание операции {OperationId} создан и получен ответ ProviderPaymentId: {ProviderPaymentId}, Status: {Status}", operation.OperationId, providerResponse.ProviderPaymentId, providerResponse.Status);
-            
-            operation.ProviderPaymentId = providerResponse.ProviderPaymentId;
-            await operationRepository.UpdateOperationAsync(operation);
-            logger.LogInformation("--- Id операции {OperationId} у провайдера сохранён: {ProviderPaymentId}", operationId, operation.ProviderPaymentId);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Ошибка при вызове провайдера для {OperationId}. Операция остается в состоянии PROCESSING", operationId);
-            throw;
-        }
         
         return (MapToResponse(operation), true);
     }

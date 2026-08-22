@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using TransactionService.Background;
 using TransactionService.Data;
 using TransactionService.Data.DTOs;
 using TransactionService.Extensions;
@@ -10,8 +11,8 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 builder.Services.AddDataAccess(builder.Configuration);
-
 builder.Services.AddApplicationServices();
+builder.Services.AddHostedService<PaymentBackgroundService>();
 
 builder.Services.AddHttpClient<IProviderService, ProviderService>(client =>
 {
