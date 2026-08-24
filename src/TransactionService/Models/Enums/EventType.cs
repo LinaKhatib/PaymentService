@@ -19,6 +19,5 @@ public enum EventType
     // после callback
     COMPLETED,   // callback с успехом (финальный статус)
     REJECTED,   // callback с отказом (финальный статус)
-    CALLBACK_CONFLICT,   // callback с неверным ProviderPaymentId (409)
-    CALLBACK_DUPLICATE   // поздний callback (операция уже финальная)
+    IGNORED   // callback с неверным ProviderPaymentId (409) и поздний callback (операция уже финальная)
 }

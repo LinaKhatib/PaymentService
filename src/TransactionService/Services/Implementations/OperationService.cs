@@ -1,5 +1,6 @@
 ﻿using TransactionService.Data.DTOs;
 using TransactionService.Data.Interfaces;
+using TransactionService.Exceptions;
 using TransactionService.Models;
 using TransactionService.Models.Enums;
 
@@ -93,6 +94,85 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         
         return MapToResponse(operation);
     }
+    
+    public async Task HandleReceiptAsync(ReceiptRequest receipt)
+    {
+        var operation = await operationRepository.GetByOperationIdAsync(receipt.OperationId);
+        
+        // операции не существует
+        if (operation == null)
+        {
+            logger.LogWarning("--- Операция {OperationId} не найдена для пришедшей квитанции", receipt.OperationId);
+            throw new NotFoundException($"Операция {receipt.OperationId} не найдена");
+        }
+
+        // в операции уже есть ProviderPaymentId, а ProviderPaymentId из квитанции несоответстует
+        if (operation.ProviderPaymentId != null && operation.ProviderPaymentId != receipt.ProviderPaymentId)
+        {
+            logger.LogWarning("ProviderPaymentId несоответствует для {OperationId}: stored={Stored}, received={Received}",
+                receipt.OperationId, operation.ProviderPaymentId, receipt.ProviderPaymentId);
+            
+            throw new ConflictException(
+                $"ProviderPaymentId несоответствует: {operation.ProviderPaymentId} vs {receipt.ProviderPaymentId}"
+            );
+        }
+
+        // у операции не было ProviderPaymentId. ProviderPaymentId из квитанции сохраняется
+        if (operation.ProviderPaymentId == null)
+        {
+            operation.ProviderPaymentId = receipt.ProviderPaymentId;
+            await operationRepository.UpdateOperationAsync(operation);
+            
+            logger.LogInformation("Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {OperationId}", receipt.ProviderPaymentId, receipt.OperationId);
+        }
+
+        if (operation.Status == OperationStatus.COMPLETED || operation.Status == OperationStatus.REJECTED)
+        {
+            await eventRepository.AddEventAsync(new Event
+            {
+                OperationId = operation.OperationId,
+                Type = EventType.IGNORED,
+                FromStatus = operation.Status,
+                ToStatus = operation.Status,
+                Message = $"Ignored {receipt.Result} callback, already {operation.Status}",
+                OccurredAt = DateTime.UtcNow,
+                Operation = operation
+            });
+            
+            logger.LogWarning("Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
+            return;
+        }
+
+        if (!Enum.TryParse<OperationStatus>(receipt.Result.ToUpper(), ignoreCase: true, out var newStatus))
+        {
+            throw new BadRequestException($"Недопустимый результат: {receipt.Result}");
+        }
+
+        if (newStatus != OperationStatus.COMPLETED && newStatus != OperationStatus.REJECTED)
+        {
+            throw new BadRequestException($"Ожидалось COMPLETED или REJECTED, но получен {receipt.Result}");
+        }
+
+        operation.Status = newStatus; 
+        await operationRepository.UpdateOperationAsync(operation);
+        
+        var newEvent = new Event
+        {
+            OperationId = operation.OperationId,
+            FromStatus = OperationStatus.PROCESSING,
+            ToStatus = operation.Status,
+            Message = receipt.Message,
+            OccurredAt = DateTime.UtcNow,
+            Operation = operation
+        };
+
+        newEvent.Type = receipt.Result.ToUpper() == nameof(EventType.COMPLETED) ? EventType.COMPLETED : EventType.REJECTED;
+        
+        await eventRepository.AddEventAsync(newEvent);
+        
+        logger.LogInformation("Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
+    }
+
 
     private OperationResponse MapToResponse(Operation operation)
     {

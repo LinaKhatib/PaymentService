@@ -4,7 +4,7 @@ using TransactionService.Data.DTOs;
 
 namespace TransactionService.Services;
 
-public class ProviderService(ILogger<OperationService> logger, HttpClient httpClient) : IProviderService //пока заглушка
+public class ProviderService(ILogger<OperationService> logger, HttpClient httpClient) : IProviderService
 {
     public async Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency)
     {

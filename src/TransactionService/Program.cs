@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using TransactionService.Background;
 using TransactionService.Data;
 using TransactionService.Data.DTOs;
+using TransactionService.Exceptions;
 using TransactionService.Extensions;
 using TransactionService.Services;
 
@@ -123,6 +124,27 @@ app.MapGet("/operations/{id}/events", async (string id, IEventService? service, 
     }
 });
 
+app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService service, ILogger<Program> logger) =>
+{
+    try
+    {
+        await service.HandleReceiptAsync(receipt);
+        return Results.NoContent();
 
+    }
+    catch (NotFoundException ex)
+    {
+        return Results.NotFound(new { error = ex.Message });
+    }
+    catch (ConflictException ex)
+    {
+        return Results.Conflict(new { error = ex.Message });
+    }
+    catch (Exception ex)
+    {
+        logger.LogError(ex, "Ошибка при обработке квитанции для {OperationId}", receipt.OperationId);
+        return Results.StatusCode(500);
+    }
+});
 
 app.Run();
