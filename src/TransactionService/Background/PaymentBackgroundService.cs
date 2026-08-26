@@ -78,6 +78,49 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
                     OccurredAt = DateTime.UtcNow,
                     Operation = operation
                 }, cancellationToken);
+                
+                var freshOperation = await operationRepository.GetByOperationIdAsync(operation.OperationId, cancellationToken);
+            
+                if (freshOperation == null)
+                    continue;
+                
+                if (!string.IsNullOrEmpty(freshOperation.ProviderPaymentId))
+                {
+                    logger.LogInformation("-- ProviderPaymentId уже установлен для {OperationId}: {ProviderPaymentId}, пропускаем", operation.OperationId, freshOperation.ProviderPaymentId);
+                    if (freshOperation.ProviderPaymentId == response.ProviderPaymentId)
+                    {
+                        await eventRepository.AddEventAsync(new Event
+                        {
+                            OperationId = operation.OperationId,
+                            Type = EventType.LATE_PROVIDER_RESPONSE_RECEIVED,
+                            FromStatus = OperationStatus.PROCESSING,
+                            ToStatus = OperationStatus.PROCESSING,
+                            Message = $"A late response arrived from the provider: {response.ProviderPaymentId}",
+                            OccurredAt = DateTime.UtcNow,
+                            Operation = operation
+                        }, cancellationToken);
+                    }
+                    else
+                    {
+                        await eventRepository.AddEventAsync(new Event
+                        {
+                            OperationId = operation.OperationId,
+                            Type = EventType.LATE_PROVIDER_RESPONSE_IGNORED,
+                            FromStatus = OperationStatus.PROCESSING,
+                            ToStatus = OperationStatus.PROCESSING,
+                            Message = $"A late response arrived from the provider with an incorrect ProviderPaymentId: {response.ProviderPaymentId}",
+                            OccurredAt = DateTime.UtcNow,
+                            Operation = operation
+                        }, cancellationToken);
+                    }
+                    continue;
+                }
+                
+                if (freshOperation.Status == OperationStatus.COMPLETED || freshOperation.Status == OperationStatus.REJECTED) 
+                {
+                    logger.LogWarning("-- Операция {OperationId} уже в финальном статусе: {Status}, пропускаем", operation.OperationId, freshOperation.Status);
+                    continue;
+                }
 
                 operation.RetryCount = 0;
                 operation.ProviderPaymentId = response.ProviderPaymentId;
