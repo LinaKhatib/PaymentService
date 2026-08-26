@@ -6,11 +6,11 @@ namespace TransactionService.Services;
 
 public class EventService(IEventRepository eventRepository, ILogger<Program> logger) : IEventService
 {
-    public async Task<IEnumerable<EventResponse>> GetEventsByOperationIdAsync(string operationId)
+    public async Task<IEnumerable<EventResponse>> GetEventsByOperationIdAsync(string operationId, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("Запрос истории событий для операции: {OperationId}", operationId);
 
-        var events = await eventRepository.GetByOperationIdAsync(operationId);
+        var events = await eventRepository.GetByOperationIdAsync(operationId, cancellationToken);
 
         if (events == null || !events.Any())
         {

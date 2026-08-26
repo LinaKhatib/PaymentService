@@ -8,11 +8,11 @@ namespace TransactionService.Services;
 
 public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, /*IProviderService providerService,*/ ILogger<OperationService> logger) : IOperationService
 {
-    public async Task<OperationResponse> CreateOperationAsync(OperationRequest request)
+    public async Task<OperationResponse> CreateOperationAsync(OperationRequest request, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("--- Создание операции: {OperationId}", request.OperationId);
         
-        if (await operationRepository.ExistsOperationAsync(request.OperationId))
+        if (await operationRepository.ExistsOperationAsync(request.OperationId, cancellationToken))
         {
             logger.LogWarning("--- Операция уже существует: {OperationId}", request.OperationId);
             //throw new InvalidOperationException($"Операция {request.OperationId} уже существует.");
@@ -27,7 +27,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             Description = request.Description,
             Status = OperationStatus.CREATED
         };
-        await operationRepository.CreateOperationAsync(newOperation);
+        await operationRepository.CreateOperationAsync(newOperation, cancellationToken);
         logger.LogInformation("--- Операция сохранена в БД: {OperationId}", newOperation.OperationId);
         
         var newEvent = new Event
@@ -39,16 +39,16 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             OccurredAt =  DateTime.UtcNow,
             Operation = newOperation
         };
-        await eventRepository.AddEventAsync(newEvent);
+        await eventRepository.AddEventAsync(newEvent, cancellationToken);
         logger.LogInformation("--- Событие создано для операции {OperationId}: {EventType}", newOperation.OperationId, newEvent.Type);
 
         return MapToResponse(newOperation);
     }
 
-    public async Task<(OperationResponse, bool StatusChanged)> SubmitOperationAsync(string operationId)
+    public async Task<(OperationResponse, bool StatusChanged)> SubmitOperationAsync(string operationId, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("--- Отправка провайдеру запроса на создание операции: {OperationId}", operationId);
-        var operation = await operationRepository.GetByOperationIdAsync(operationId);
+        var operation = await operationRepository.GetByOperationIdAsync(operationId, cancellationToken);
 
         if (operation == null)
         {
@@ -64,7 +64,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         }
         
         operation.Status = OperationStatus.PROCESSING;
-        await operationRepository.UpdateOperationAsync(operation);
+        await operationRepository.UpdateOperationAsync(operation, cancellationToken);
         
         var newEvent = new Event
         {
@@ -76,16 +76,16 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             OccurredAt =  DateTime.UtcNow,
             Operation = operation
         };
-        await eventRepository.AddEventAsync(newEvent);
+        await eventRepository.AddEventAsync(newEvent, cancellationToken);
         logger.LogInformation("--- Событие создано для операции {OperationId}: {EventType}. А операция переведена в статус {OperationStatus}", operation.OperationId, newEvent.Type, operation.Status);
         
         return (MapToResponse(operation), true);
     }
 
-    public async Task<OperationResponse> GetOperationAsync(string operationId)
+    public async Task<OperationResponse> GetOperationAsync(string operationId, CancellationToken cancellationToken = default)
     {
         logger.LogInformation("--- Запрос на получение стауса операции: {OperationId}", operationId);
-        var operation = await operationRepository.GetByOperationIdAsync(operationId);
+        var operation = await operationRepository.GetByOperationIdAsync(operationId, cancellationToken);
 
         if (operation == null)
         {
@@ -98,9 +98,9 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         return MapToResponse(operation);
     }
     
-    public async Task HandleReceiptAsync(ReceiptRequest receipt)
+    public async Task HandleReceiptAsync(ReceiptRequest receipt, CancellationToken cancellationToken = default)
     {
-        var operation = await operationRepository.GetByOperationIdAsync(receipt.OperationId);
+        var operation = await operationRepository.GetByOperationIdAsync(receipt.OperationId, cancellationToken);
         
         // операции не существует
         if (operation == null)
@@ -124,7 +124,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         if (operation.ProviderPaymentId == null)
         {
             operation.ProviderPaymentId = receipt.ProviderPaymentId;
-            await operationRepository.UpdateOperationAsync(operation);
+            await operationRepository.UpdateOperationAsync(operation, cancellationToken);
             
             logger.LogInformation("Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {OperationId}", receipt.ProviderPaymentId, receipt.OperationId);
         }
@@ -140,7 +140,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
                 Message = $"Ignored {receipt.Result} callback, already {operation.Status}",
                 OccurredAt = DateTime.UtcNow,
                 Operation = operation
-            });
+            }, cancellationToken);
             
             logger.LogWarning("Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
             return;
@@ -155,7 +155,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         var eventType = newStatus == OperationStatus.COMPLETED ? EventType.COMPLETED : EventType.REJECTED; 
         
         operation.Status = newStatus; 
-        await operationRepository.UpdateOperationAsync(operation);
+        await operationRepository.UpdateOperationAsync(operation, cancellationToken);
 
         await eventRepository.AddEventAsync(new Event
         {
@@ -166,7 +166,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             Message = receipt.Message,
             OccurredAt = DateTime.UtcNow,
             Operation = operation
-        });
+        }, cancellationToken);
         
         logger.LogInformation("Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
     }

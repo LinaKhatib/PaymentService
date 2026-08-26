@@ -4,5 +4,5 @@ namespace TransactionService.Services;
 
 public interface IProviderService
 {
-    Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency);
+    Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency, CancellationToken cancellationToken = default);
 }

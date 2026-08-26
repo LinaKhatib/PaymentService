@@ -13,5 +13,6 @@ public class Operation
     
     public List<Event> Events { get; set; } = new();
     
-    public int EventCount { get; set; }
+    public int RetryCount { get; set; } = 0;
+
 }

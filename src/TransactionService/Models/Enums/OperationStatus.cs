@@ -5,5 +5,6 @@ public enum OperationStatus
     CREATED,
     PROCESSING,
     COMPLETED,
-    REJECTED
+    REJECTED, 
+    FAILED
 }

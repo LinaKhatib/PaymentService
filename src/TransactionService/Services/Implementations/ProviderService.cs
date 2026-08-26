@@ -6,7 +6,7 @@ namespace TransactionService.Services;
 
 public class ProviderService(ILogger<OperationService> logger, HttpClient httpClient) : IProviderService
 {
-    public async Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency)
+    public async Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency, CancellationToken cancellationToken = default)
     {
         var requestBody = new ProviderRequest
         {
@@ -30,8 +30,8 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
 
         try
         {
-            var response = await httpClient.SendAsync(request);
-            var responseContent = await response.Content.ReadAsStringAsync();
+            var response = await httpClient.SendAsync(request, cancellationToken);
+            var responseContent = await response.Content.ReadAsStringAsync(cancellationToken);
 
             if (response.IsSuccessStatusCode)
             {

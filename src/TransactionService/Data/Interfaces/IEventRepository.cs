@@ -5,7 +5,7 @@ namespace TransactionService.Data.Interfaces;
 
 public interface IEventRepository
 {
-    Task<Event> AddEventAsync(Event newEvent);
-    Task<IEnumerable<Event>> GetByOperationIdAsync(string operationId);
-    Task<bool> HasEventAsync(string operationId, EventType type);
+    Task<Event> AddEventAsync(Event newEvent, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Event>> GetByOperationIdAsync(string operationId, CancellationToken cancellationToken = default);
+    Task<bool> HasEventAsync(string operationId, EventType type, CancellationToken cancellationToken = default);
 }

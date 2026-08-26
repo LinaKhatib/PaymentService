@@ -41,14 +41,14 @@ app.MapControllers();
 
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
-app.MapPost("/operations", async (OperationRequest request, IOperationService service, ILogger<Program> logger) =>
+app.MapPost("/operations", async (OperationRequest request, IOperationService service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation("--- POST /operations: OperationId={OperationId}, Amount={Amount}, Currency={Currency}", 
         request.OperationId, request.Amount, request.Currency);
     
     try
     {
-        var result = await service.CreateOperationAsync(request);
+        var result = await service.CreateOperationAsync(request, cancellationToken);
         logger.LogInformation($"--- Операция создана: {result.OperationId}, статус: {result.Status}");
         
         return Results.Created($"/operations/{result.OperationId}", result);
@@ -60,12 +60,12 @@ app.MapPost("/operations", async (OperationRequest request, IOperationService se
     }
 });
 
-app.MapGet("/operations/{id}", async (string id, IOperationService service, ILogger<Program> logger) =>
+app.MapGet("/operations/{id}", async (string id, IOperationService service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation($"--- GET /operations/{id}");
     try
     {
-        var result = await service.GetOperationAsync(id);
+        var result = await service.GetOperationAsync(id, cancellationToken);
         logger.LogInformation($"--- Операция {id} имеет статус {result.Status}");
                 
         return Results.Ok(result);
@@ -77,12 +77,12 @@ app.MapGet("/operations/{id}", async (string id, IOperationService service, ILog
     }
 });
 
-app.MapPost("/operations/{id}/submit", async (string id, IOperationService service, ILogger<Program> logger) =>
+app.MapPost("/operations/{id}/submit", async (string id, IOperationService service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation($"--- POST /operations/{id}/submit");
     try
     {
-        var (response, statusChanged) = await service.SubmitOperationAsync(id);
+        var (response, statusChanged) = await service.SubmitOperationAsync(id, cancellationToken);
         
         if (statusChanged)
         {
@@ -100,12 +100,12 @@ app.MapPost("/operations/{id}/submit", async (string id, IOperationService servi
     }
 });
 
-app.MapGet("/operations/{id}/events", async (string id, IEventService? service, ILogger<Program> logger) =>
+app.MapGet("/operations/{id}/events", async (string id, IEventService? service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation($"--- GET /operations/{id}/events");
     try
     {
-        var events = await service.GetEventsByOperationIdAsync(id);
+        var events = await service.GetEventsByOperationIdAsync(id, cancellationToken);
         if (!events.Any() || events == null)
         {
             logger.LogInformation($"--- События операции {id} не найдены");
@@ -122,12 +122,12 @@ app.MapGet("/operations/{id}/events", async (string id, IEventService? service, 
     }
 });
 
-app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService service, ILogger<Program> logger) =>
+app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation($"--- POST /receipts");
     try
     {
-        await service.HandleReceiptAsync(receipt);
+        await service.HandleReceiptAsync(receipt, cancellationToken);
         
         logger.LogInformation($"--- Получел callback от провайдера с статусом {receipt.Result} для операции {receipt.OperationId}");
         return Results.NoContent();

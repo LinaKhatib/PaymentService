@@ -4,5 +4,5 @@ namespace TransactionService.Services;
 
 public interface IEventService
 {
-    Task<IEnumerable<EventResponse>> GetEventsByOperationIdAsync(string operationId);
+    Task<IEnumerable<EventResponse>> GetEventsByOperationIdAsync(string operationId, CancellationToken cancellationToken = default);
 }

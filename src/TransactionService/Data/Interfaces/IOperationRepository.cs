@@ -4,9 +4,9 @@ namespace TransactionService.Data.Interfaces;
 
 public interface IOperationRepository
 {
-    Task<Operation?> GetByOperationIdAsync(string operationId);
-    Task<Operation> CreateOperationAsync(Operation operation);
-    Task UpdateOperationAsync(Operation operation);
-    Task<bool> ExistsOperationAsync(string operationId);
-    Task<IEnumerable<Operation>> GetProcessingOperationsAsync();
+    Task<Operation?> GetByOperationIdAsync(string operationId, CancellationToken cancellationToken = default);
+    Task<Operation> CreateOperationAsync(Operation operation, CancellationToken cancellationToken = default);
+    Task UpdateOperationAsync(Operation operation, CancellationToken cancellationToken = default);
+    Task<bool> ExistsOperationAsync(string operationId, CancellationToken cancellationToken = default);
+    Task<IEnumerable<Operation>> GetProcessingOperationsAsync(CancellationToken cancellationToken);
 }

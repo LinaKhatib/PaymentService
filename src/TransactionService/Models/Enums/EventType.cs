@@ -7,6 +7,7 @@ public enum EventType
     SUBMIT_ATTEMPT,   // запланирована отправка провайдеру
     PROVIDER_REQUEST,   // отправка запроса провайдеру
     PROVIDER_TIMEOUT,   // таймаут ожидания ответа от провайдера
+    FAILED,
     
     // после http-запроса к провайдеру
     PROVIDER_RESPONSE_RECEIVED,   // успешный ответ от провайдера 
