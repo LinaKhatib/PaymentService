@@ -55,12 +55,12 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
             logger.LogError("Провайдер вернул ошибку для операции OperationId: {OperationId}. Status: {StatusCode}, Response: {Response}",
                 operationId, response.StatusCode, responseContent);
             
-            throw new Exception($"Ошибка провайдера: {response.StatusCode}, {responseContent}");
+            throw new InvalidOperationException($"Ошибка провайдера: {response.StatusCode}, {responseContent}");
         }
         
-        catch (TaskCanceledException e)
+        catch (TaskCanceledException e) when (e.InnerException is TimeoutException) 
         {
-            logger.LogWarning(e, "Превышено время ожидания ответа от провайдера для операции OperationId: {OperationId}", operationId);
+           logger.LogWarning(e, "Превышено время ожидания ответа от провайдера для операции OperationId: {OperationId}", operationId);
             throw new HttpRequestException("Таймаут от правайдера", e);
         }
         

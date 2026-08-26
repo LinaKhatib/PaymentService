@@ -1,5 +1,6 @@
 ﻿using TransactionService.Data.DTOs;
 using TransactionService.Data.Interfaces;
+using TransactionService.Exceptions;
 
 namespace TransactionService.Services;
 
@@ -14,7 +15,7 @@ public class EventService(IEventRepository eventRepository, ILogger<Program> log
         if (events == null || !events.Any())
         {
             logger.LogWarning("--- События операции {OperationId} не найдены", operationId);
-            throw new KeyNotFoundException($"События операции {operationId} не найдены.");
+            throw new NotFoundException($"События операции {operationId} не найдены.");
         }
          
         var eventResponses = events.Select(e => new EventResponse

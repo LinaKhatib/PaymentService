@@ -15,7 +15,8 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         if (await operationRepository.ExistsOperationAsync(request.OperationId))
         {
             logger.LogWarning("--- Операция уже существует: {OperationId}", request.OperationId);
-            throw new InvalidOperationException($"Операция {request.OperationId} уже существует.");
+            //throw new InvalidOperationException($"Операция {request.OperationId} уже существует.");
+            throw new ConflictException($"Операция {request.OperationId} уже существует.");
         }
 
         var newOperation = new Operation
@@ -52,7 +53,8 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         if (operation == null)
         {
             logger.LogWarning("--- Операция не найдена: {OperationId}", operationId);
-            throw new KeyNotFoundException($"Операция {operationId} не найдена.");
+            //throw new KeyNotFoundException($"Операция {operationId} не найдена.");
+            throw new NotFoundException($"Операция {operationId} не найдена.");
         }
 
         if (operation.Status != OperationStatus.CREATED)
@@ -88,7 +90,8 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         if (operation == null)
         {
             logger.LogWarning("--- Операции не найдена: {OperationId}", operationId);
-            throw new KeyNotFoundException($"Операция {operationId} не найдена.");
+            //throw new KeyNotFoundException($"Операция {operationId} не найдена.");
+            throw new NotFoundException($"Операция {operationId} не найдена.");
         }
         logger.LogInformation("--- Cтатус операции {OperationId}: {Status}", operationId, operation.Status);
         
@@ -142,33 +145,28 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             logger.LogWarning("Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
             return;
         }
-
-        if (!Enum.TryParse<OperationStatus>(receipt.Result.ToUpper(), ignoreCase: true, out var newStatus))
+        
+        if (!Enum.TryParse<OperationStatus>(receipt.Result.ToUpper(), ignoreCase: true, out var newStatus) ||
+            (newStatus != OperationStatus.COMPLETED && newStatus != OperationStatus.REJECTED))
         {
-            throw new BadRequestException($"Недопустимый результат: {receipt.Result}");
+            throw new BadRequestException($"Недопустимый результат: {receipt.Result}. Ожидалось COMPLETED или REJECTED.");
         }
 
-        if (newStatus != OperationStatus.COMPLETED && newStatus != OperationStatus.REJECTED)
-        {
-            throw new BadRequestException($"Ожидалось COMPLETED или REJECTED, но получен {receipt.Result}");
-        }
-
+        var eventType = newStatus == OperationStatus.COMPLETED ? EventType.COMPLETED : EventType.REJECTED; 
+        
         operation.Status = newStatus; 
         await operationRepository.UpdateOperationAsync(operation);
-        
-        var newEvent = new Event
+
+        await eventRepository.AddEventAsync(new Event
         {
             OperationId = operation.OperationId,
+            Type = eventType,
             FromStatus = OperationStatus.PROCESSING,
             ToStatus = operation.Status,
             Message = receipt.Message,
             OccurredAt = DateTime.UtcNow,
             Operation = operation
-        };
-
-        newEvent.Type = receipt.Result.ToUpper() == nameof(EventType.COMPLETED) ? EventType.COMPLETED : EventType.REJECTED;
-        
-        await eventRepository.AddEventAsync(newEvent);
+        });
         
         logger.LogInformation("Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
     }

@@ -39,8 +39,6 @@ if (app.Environment.IsDevelopment())
 
 app.MapControllers();
 
-// Тестовые 
-
 app.MapGet("/health", () => Results.Ok(new { status = "healthy" }));
 
 app.MapPost("/operations", async (OperationRequest request, IOperationService service, ILogger<Program> logger) =>
@@ -55,7 +53,7 @@ app.MapPost("/operations", async (OperationRequest request, IOperationService se
         
         return Results.Created($"/operations/{result.OperationId}", result);
     }
-    catch (Exception e)
+    catch (ConflictException e)
     {
         logger.LogError(e, $"--- Ошибка при создании операции {request.OperationId}");
         return Results.Conflict(e.Message);
@@ -72,10 +70,10 @@ app.MapGet("/operations/{id}", async (string id, IOperationService service, ILog
                 
         return Results.Ok(result);
     }
-    catch (Exception e)
+    catch (NotFoundException e)
     {
         logger.LogError(e, $"--- Операция с Id {id} не найдена");
-        return Results.NotFound();
+        return Results.NotFound(e.Message);
     }
 });
 
@@ -95,10 +93,10 @@ app.MapPost("/operations/{id}/submit", async (string id, IOperationService servi
         logger.LogInformation($"--- Запрос на создание операции {id} ранее уже был отправлен провайдеру");
         return Results.Ok(response);
     }
-    catch (Exception e)
+    catch (NotFoundException e)
     {
         logger.LogError(e, $"--- Операция с Id {id} не найдена");
-        return Results.NotFound();
+        return Results.NotFound(e.Message);
     }
 });
 
@@ -117,20 +115,22 @@ app.MapGet("/operations/{id}/events", async (string id, IEventService? service, 
         logger.LogInformation($"--- Найдено {events.Count()} событий для операции {id}");
         return Results.Ok(events);
     }
-    catch (Exception e)
+    catch (NotFoundException e)
     {
         logger.LogError(e, "--- При получении событий произошла ошибка");
-        return Results.Problem("При получении событий произошла ошибка");
+        return Results.NotFound(e.Message);
     }
 });
 
 app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService service, ILogger<Program> logger) =>
 {
+    logger.LogInformation($"--- POST /receipts");
     try
     {
         await service.HandleReceiptAsync(receipt);
+        
+        logger.LogInformation($"--- Получел callback от провайдера с статусом {receipt.Result} для операции {receipt.OperationId}");
         return Results.NoContent();
-
     }
     catch (NotFoundException ex)
     {

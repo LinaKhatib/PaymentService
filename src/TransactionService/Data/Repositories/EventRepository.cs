@@ -14,13 +14,12 @@ public class EventRepository(PaymentDbContext context, ILogger<EventRepository> 
             .Where(e => e.OperationId == newEvent.OperationId)
             .MaxAsync(e => (int?)e.EventId) ?? 0;
         
-        newEvent.EventId = maxEventId + 1; // ← Присваиваем логический EventId
+        newEvent.EventId = maxEventId + 1;
         
-        // Id (первичный ключ) сгенерируется БД автоматически!
         await context.Events.AddAsync(newEvent);
         await context.SaveChangesAsync();
         
-        logger.LogDebug("Событие сохранено: Id={Id}, EventId={EventId}", newEvent.Id, newEvent.EventId);
+        logger.LogDebug("--- Событие сохранено: Id={Id}, EventId={EventId}", newEvent.Id, newEvent.EventId);
         return newEvent;
         
     }
