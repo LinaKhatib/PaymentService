@@ -112,7 +112,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         // в операции уже есть ProviderPaymentId, а ProviderPaymentId из квитанции несоответстует
         if (operation.ProviderPaymentId != null && operation.ProviderPaymentId != receipt.ProviderPaymentId)
         {
-            logger.LogWarning("ProviderPaymentId несоответствует для {OperationId}: stored={Stored}, received={Received}",
+            logger.LogWarning("--- ProviderPaymentId несоответствует для {OperationId}: stored={Stored}, received={Received}",
                 receipt.OperationId, operation.ProviderPaymentId, receipt.ProviderPaymentId);
             
             throw new ConflictException(
@@ -126,7 +126,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             operation.ProviderPaymentId = receipt.ProviderPaymentId;
             await operationRepository.UpdateOperationAsync(operation, cancellationToken);
             
-            logger.LogInformation("Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {OperationId}", receipt.ProviderPaymentId, receipt.OperationId);
+            logger.LogInformation("--- Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {OperationId}", receipt.ProviderPaymentId, receipt.OperationId);
         }
 
         if (operation.Status == OperationStatus.COMPLETED || operation.Status == OperationStatus.REJECTED)
@@ -142,7 +142,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
                 Operation = operation
             }, cancellationToken);
             
-            logger.LogWarning("Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
+            logger.LogWarning("--- Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
             return;
         }
         
@@ -168,7 +168,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             Operation = operation
         }, cancellationToken);
         
-        logger.LogInformation("Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
+        logger.LogInformation("--- Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
     }
 
 

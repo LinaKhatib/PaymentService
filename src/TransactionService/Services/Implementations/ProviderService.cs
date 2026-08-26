@@ -26,7 +26,7 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
         request.Headers.Add("Idempotency-Key", operationId);
         request.Headers.Add("X-Correlation-ID", operationId);
         
-        logger.LogInformation("Отправка платежа провайдеру. OperationId: {OperationId}, Idempotency-Key: {IdempotencyKey}", operationId, operationId);
+        logger.LogInformation("--- Отправка платежа провайдеру. OperationId: {OperationId}, Idempotency-Key: {IdempotencyKey}", operationId, operationId);
 
         try
         {
@@ -40,7 +40,7 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
                     new JsonSerializerOptions{PropertyNameCaseInsensitive = true});
 
                 logger.LogInformation(
-                    "Провайдер принял платеж. OperationId: {OperationId}, ProviderPaymentId: {ProviderPaymentId}",
+                    "--- Провайдер принял платеж. OperationId: {OperationId}, ProviderPaymentId: {ProviderPaymentId}",
                     operationId, result?.ProviderPaymentId);
                 
                 return result ?? throw new Exception("Провайдер вернул null");;
@@ -48,11 +48,11 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
 
             if (response.StatusCode == System.Net.HttpStatusCode.ServiceUnavailable)
             {
-                logger.LogWarning("ПРовайдер вернул код 503 для операции OperationId: {OperationId}", operationId);
+                logger.LogWarning("--- ПРовайдер вернул код 503 для операции OperationId: {OperationId}", operationId);
                 throw new HttpRequestException($"Провайдер недоступен: {response.StatusCode}");
             }
             
-            logger.LogError("Провайдер вернул ошибку для операции OperationId: {OperationId}. Status: {StatusCode}, Response: {Response}",
+            logger.LogError("--- Провайдер вернул ошибку для операции OperationId: {OperationId}. Status: {StatusCode}, Response: {Response}",
                 operationId, response.StatusCode, responseContent);
             
             throw new InvalidOperationException($"Ошибка провайдера: {response.StatusCode}, {responseContent}");
@@ -60,13 +60,13 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
         
         catch (TaskCanceledException e) when (e.InnerException is TimeoutException) 
         {
-           logger.LogWarning(e, "Превышено время ожидания ответа от провайдера для операции OperationId: {OperationId}", operationId);
+           logger.LogWarning(e, "--- Превышено время ожидания ответа от провайдера для операции OperationId: {OperationId}", operationId);
             throw new HttpRequestException("Таймаут от правайдера", e);
         }
         
         catch (Exception e)
         {
-            logger.LogError(e, "Ошибка при вызове провайдера для OperationId: {OperationId}", operationId);
+            logger.LogError(e, "--- Ошибка при вызове провайдера для OperationId: {OperationId}", operationId);
             throw;
         }
     }

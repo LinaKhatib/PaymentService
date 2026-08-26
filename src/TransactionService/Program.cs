@@ -100,19 +100,20 @@ app.MapPost("/operations/{id}/submit", async (string id, IOperationService servi
     }
 });
 
-app.MapGet("/operations/{id}/events", async (string id, IEventService? service, ILogger<Program> logger, CancellationToken cancellationToken) =>
+app.MapGet("/operations/{id}/events", async (string id, IEventService service, ILogger<Program> logger, CancellationToken cancellationToken) =>
 {
     logger.LogInformation($"--- GET /operations/{id}/events");
     try
     {
         var events = await service.GetEventsByOperationIdAsync(id, cancellationToken);
-        if (!events.Any() || events == null)
+        
+        if (events.Count == 0)
         {
             logger.LogInformation($"--- События операции {id} не найдены");
             return Results.NotFound($"События операции {id} не найдены.");
         }
         
-        logger.LogInformation($"--- Найдено {events.Count()} событий для операции {id}");
+        logger.LogInformation($"--- Найдено {events.Count} событий для операции {id}");
         return Results.Ok(events);
     }
     catch (NotFoundException e)
@@ -142,7 +143,7 @@ app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService servic
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Ошибка при обработке квитанции для {OperationId}", receipt.OperationId);
+        logger.LogError(ex, "-- Ошибка при обработке квитанции для {OperationId}", receipt.OperationId);
         return Results.StatusCode(500);
     }
 });
