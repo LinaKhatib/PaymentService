@@ -6,7 +6,7 @@ using TransactionService.Models.Enums;
 
 namespace TransactionService.Services;
 
-public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, /*IProviderService providerService,*/ ILogger<OperationService> logger) : IOperationService
+public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, ILogger<OperationService> logger, IEventFactory eventFactory) : IOperationService
 {
     public async Task<OperationResponse> CreateOperationAsync(OperationRequest request, CancellationToken cancellationToken = default)
     {
@@ -29,17 +29,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         await operationRepository.CreateOperationAsync(newOperation, cancellationToken);
         logger.LogInformation("--- Операция сохранена в БД: {OperationId}", newOperation.OperationId);
         
-        // var newEvent = new Event
-        // {
-        //     OperationId = newOperation.OperationId,
-        //     Type = EventType.CREATED,
-        //     ToStatus = newOperation.Status,
-        //     Message = "Operation created",
-        //     OccurredAt =  DateTime.UtcNow,
-        //     Operation = newOperation
-        // };
-
-        var newEvent = MapToEvent(
+        var newEvent = eventFactory.CreateEventAsync(
             newOperation, 
             EventType.CREATED, 
             "Operation created", 
@@ -72,18 +62,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         operation.Status = OperationStatus.PROCESSING;
         await operationRepository.UpdateOperationAsync(operation, cancellationToken);
         
-        // var newEvent = new Event
-        // {
-        //     OperationId = operation.OperationId,
-        //     Type = EventType.SUBMIT_ATTEMPT,
-        //     FromStatus = OperationStatus.CREATED,
-        //     ToStatus = OperationStatus.PROCESSING,
-        //     Message = "Submit initiated, waiting for provider...",
-        //     OccurredAt =  DateTime.UtcNow,
-        //     Operation = operation
-        // };
-        
-        var newEvent = MapToEvent(
+        var newEvent = eventFactory.CreateEventAsync(
             operation, 
             EventType.SUBMIT_ATTEMPT, 
             "Submit initiated, waiting for provider...", 
@@ -143,18 +122,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
 
         if (operation.Status == OperationStatus.COMPLETED || operation.Status == OperationStatus.REJECTED)
         {
-            // await eventRepository.AddEventAsync(new Event
-            // {
-            //     OperationId = operation.OperationId,
-            //     Type = EventType.IGNORED,
-            //     FromStatus = operation.Status,
-            //     ToStatus = operation.Status,
-            //     Message = $"Ignored {receipt.Result} callback, already {operation.Status}",
-            //     OccurredAt = DateTime.UtcNow,
-            //     Operation = operation
-            // }, cancellationToken);
-            
-            await eventRepository.AddEventAsync(MapToEvent(
+            await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
                 operation, 
                 EventType.IGNORED, 
                 $"Ignored {receipt.Result} callback, already {operation.Status}", 
@@ -176,18 +144,7 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         operation.Status = newStatus; 
         await operationRepository.UpdateOperationAsync(operation, cancellationToken);
 
-        // await eventRepository.AddEventAsync(new Event
-        // {
-        //     OperationId = operation.OperationId,
-        //     Type = eventType,
-        //     FromStatus = OperationStatus.PROCESSING,
-        //     ToStatus = operation.Status,
-        //     Message = receipt.Message,
-        //     OccurredAt = DateTime.UtcNow,
-        //     Operation = operation
-        // }, cancellationToken);
-        
-        await eventRepository.AddEventAsync(MapToEvent(
+        await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
             operation, 
             eventType, 
             receipt.Message, 
@@ -207,24 +164,6 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             Description = operation.Description,
             Status = operation.Status.ToString(),
             ProviderPaymentId = operation.ProviderPaymentId
-        };
-    }
-
-    private Event MapToEvent(Operation operation, 
-        EventType type, 
-        string message,
-        OperationStatus? fromStatus = OperationStatus.PROCESSING,
-        OperationStatus toStatus = OperationStatus.PROCESSING)
-    {
-        return new Event
-        {
-            OperationId = operation.OperationId,
-            Type = type,
-            FromStatus = fromStatus,
-            ToStatus = toStatus,
-            Message = message,
-            OccurredAt = DateTime.UtcNow,
-            Operation = operation
         };
     }
 }

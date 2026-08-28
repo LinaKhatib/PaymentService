@@ -23,6 +23,7 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
         var operationRepository = scope.ServiceProvider.GetRequiredService<IOperationRepository>();
         var eventRepository = scope.ServiceProvider.GetRequiredService<IEventRepository>();
         var providerService = scope.ServiceProvider.GetRequiredService<IProviderService>();
+        var eventFactory = scope.ServiceProvider.GetRequiredService<IEventFactory>();
 
         var pending = await operationRepository.GetProcessingOperationsAsync(cancellationToken);
 
@@ -38,47 +39,30 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
                 logger.LogWarning("-- Операция {OperationId} превысила максимальное количество попыток ({MaxRetries}), статус изменен на FAILED", operation.OperationId, MAX_RETRIES);
                 operation.Status = OperationStatus.FAILED;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);
-                
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.FAILED,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.FAILED,
-                    Message = $"Exceeded max retries ({MAX_RETRIES})",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
+
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.FAILED,
+                    $"Exceeded max retries ({MAX_RETRIES})",
+                    toStatus: OperationStatus.FAILED), cancellationToken);
                 
                 continue;
             }
             
             try
             {
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_REQUEST,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = "Sending payment request to provider",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
-
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_REQUEST,
+                    "Sending payment request to provider"), cancellationToken);
+                
                 var response = await providerService.SendPaymentAsync(operation.OperationId, operation.Amount, operation.Currency, cancellationToken);
 
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_RESPONSE_RECEIVED,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = $"Provider accepted payment: {response.ProviderPaymentId}",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
-                
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_RESPONSE_RECEIVED,
+                    $"Provider accepted payment: {response.ProviderPaymentId}"), cancellationToken);
+               
                 var freshOperation = await operationRepository.GetByOperationIdAsync(operation.OperationId, cancellationToken);
             
                 if (freshOperation == null)
@@ -89,29 +73,17 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
                     logger.LogInformation("-- ProviderPaymentId уже установлен для {OperationId}: {ProviderPaymentId}, пропускаем", operation.OperationId, freshOperation.ProviderPaymentId);
                     if (freshOperation.ProviderPaymentId == response.ProviderPaymentId)
                     {
-                        await eventRepository.AddEventAsync(new Event
-                        {
-                            OperationId = operation.OperationId,
-                            Type = EventType.LATE_PROVIDER_RESPONSE_RECEIVED,
-                            FromStatus = OperationStatus.PROCESSING,
-                            ToStatus = OperationStatus.PROCESSING,
-                            Message = $"A late response arrived from the provider: {response.ProviderPaymentId}",
-                            OccurredAt = DateTime.UtcNow,
-                            Operation = operation
-                        }, cancellationToken);
+                        await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                            operation,
+                            EventType.LATE_PROVIDER_RESPONSE_RECEIVED,
+                            $"A late response arrived from the provider: {response.ProviderPaymentId}"), cancellationToken);
                     }
                     else
                     {
-                        await eventRepository.AddEventAsync(new Event
-                        {
-                            OperationId = operation.OperationId,
-                            Type = EventType.LATE_PROVIDER_RESPONSE_IGNORED,
-                            FromStatus = OperationStatus.PROCESSING,
-                            ToStatus = OperationStatus.PROCESSING,
-                            Message = $"A late response arrived from the provider with an incorrect ProviderPaymentId: {response.ProviderPaymentId}",
-                            OccurredAt = DateTime.UtcNow,
-                            Operation = operation
-                        }, cancellationToken);
+                        await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                            operation,
+                            EventType.LATE_PROVIDER_RESPONSE_IGNORED,
+                            $"A late response arrived from the provider with an incorrect ProviderPaymentId: {response.ProviderPaymentId}"), cancellationToken);
                     }
                     continue;
                 }
@@ -130,16 +102,10 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
             }
             catch (HttpRequestException e) when (e.Message.Contains("503") || e.Message.Contains("unavailable"))
             {
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_SERVICE_UNAVAILABLE,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = $"Provider unavailable (503): {e.Message}",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_SERVICE_UNAVAILABLE,
+                    $"Provider unavailable (503): {e.Message}"), cancellationToken);
                 
                 operation.RetryCount++;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);
@@ -148,17 +114,11 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
             }
             catch (HttpRequestException e) when (e.Message.Contains("timeout") || e.Message.Contains("Timeout"))
             {
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_TIMEOUT,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = $"Provider timeout: {e.Message}",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
-                
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_TIMEOUT,
+                    $"Provider timeout: {e.Message}"), cancellationToken);
+
                 operation.RetryCount++;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);
                 
@@ -166,16 +126,10 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
             }
             catch (HttpRequestException e)
             {
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_NETWORK_ERROR,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = $"Network error: {e.Message}",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_NETWORK_ERROR,
+                    $"Network error: {e.Message}"), cancellationToken);
                 
                 operation.RetryCount++;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);
@@ -184,16 +138,10 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
             }
             catch (Exception e)
             {
-                await eventRepository.AddEventAsync(new Event
-                {
-                    OperationId = operation.OperationId,
-                    Type = EventType.PROVIDER_UNKNOWN_ERROR,
-                    FromStatus = OperationStatus.PROCESSING,
-                    ToStatus = OperationStatus.PROCESSING,
-                    Message = $"Unexpected error: {e.Message}",
-                    OccurredAt = DateTime.UtcNow,
-                    Operation = operation
-                }, cancellationToken);
+                await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
+                    operation,
+                    EventType.PROVIDER_UNKNOWN_ERROR,
+                    $"Unexpected error: {e.Message}"), cancellationToken);
                 
                 operation.RetryCount++;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);

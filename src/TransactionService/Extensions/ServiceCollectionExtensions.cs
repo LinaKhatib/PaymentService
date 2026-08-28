@@ -2,7 +2,6 @@
 using TransactionService.Data;
 using TransactionService.Data.Interfaces;
 using TransactionService.Data.Repositories;
-using TransactionService.Models;
 using TransactionService.Services;
 
 namespace TransactionService.Extensions;
@@ -14,6 +13,8 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IOperationRepository, OperationRepository>();
         
         services.AddScoped<IEventRepository, EventRepository>();
+
+        services.AddScoped<IEventFactory, EventFactory>();
         
         services.AddDbContext<PaymentDbContext>(options =>
         {
