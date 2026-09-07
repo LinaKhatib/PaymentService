@@ -10,11 +10,20 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
 {
     public async Task<OperationResponse> CreateOperationAsync(OperationRequest request, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("--- Создание операции: {OperationId}", request.OperationId);
+        logger.LogInformation(
+            "Создание операции. {@OperationInfo}",
+            new {
+                request.OperationId,
+                request.Amount,
+                request.Currency
+            });
         
         if (await operationRepository.ExistsOperationAsync(request.OperationId, cancellationToken))
         {
-            logger.LogWarning("--- Операция уже существует: {OperationId}", request.OperationId);
+            logger.LogWarning(
+                "Операция {@OperationInfo} уже существует",
+                new {request.OperationId});
+            
             throw new ConflictException($"Операция {request.OperationId} уже существует.");
         }
 
@@ -27,7 +36,16 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             Status = OperationStatus.CREATED
         };
         await operationRepository.CreateOperationAsync(newOperation, cancellationToken);
-        logger.LogInformation("--- Операция сохранена в БД: {OperationId}", newOperation.OperationId);
+        
+        logger.LogInformation(
+            "Операция создана и сохранена в БД. {@OperationInfo}", 
+            new
+            {
+                newOperation.OperationId,
+                newOperation.Status,
+                newOperation.Amount,
+                newOperation.Currency
+            });
         
         var newEvent = eventFactory.CreateEventAsync(
             newOperation, 
@@ -37,25 +55,45 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             OperationStatus.CREATED);
         
         await eventRepository.AddEventAsync(newEvent, cancellationToken);
-        logger.LogInformation("--- Событие создано для операции {OperationId}: {EventType}", newOperation.OperationId, newEvent.Type);
+        
+        logger.LogInformation(
+            "Событие создано. {@EventInfo}", 
+            new
+            {
+                newOperation.OperationId,
+                newOperation.Status,
+                
+                newEvent.EventId,
+                newEvent.Type,
+                newEvent.OccurredAt
+            });
 
         return MapToResponse(newOperation);
     }
 
     public async Task<(OperationResponse, bool StatusChanged)> SubmitOperationAsync(string operationId, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("--- Отправка провайдеру запроса на создание операции: {OperationId}", operationId);
+        logger.LogInformation(
+            "Отправка провайдеру запроса на создание операции {@OperationInfo}", 
+            new {operationId});
+        
         var operation = await operationRepository.GetByOperationIdAsync(operationId, cancellationToken);
 
         if (operation == null)
         {
-            logger.LogWarning("--- Операция не найдена: {OperationId}", operationId);
+            logger.LogWarning(
+                "Операция {@OperationInfo} не найдена.", 
+                new {operationId});
+            
             throw new NotFoundException($"Операция {operationId} не найдена.");
         }
 
         if (operation.Status != OperationStatus.CREATED)
         {
-            logger.LogInformation("--- Запрос на создание операции провайдеру ранее уже был создан: {OperationId}", operationId);
+            logger.LogInformation(
+                "Запрос провайдеру на создание операции {@OperationInfo} ранее уже был отправлен", 
+                new {operationId});
+            
             return (MapToResponse(operation), false);
         }
         
@@ -69,22 +107,41 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             OperationStatus.CREATED);
         
         await eventRepository.AddEventAsync(newEvent, cancellationToken);
-        logger.LogInformation("--- Событие создано для операции {OperationId}: {EventType}. А операция переведена в статус {OperationStatus}", operation.OperationId, newEvent.Type, operation.Status);
+        
+        logger.LogInformation(
+            "Событие создано. {@EventInfo}",
+            new 
+            {
+                operation.OperationId,
+                operation.Status,
+                
+                newEvent.EventId,
+                newEvent.Type,
+                newEvent.OccurredAt
+            });
         
         return (MapToResponse(operation), true);
     }
 
     public async Task<OperationResponse> GetOperationAsync(string operationId, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("--- Запрос на получение стауса операции: {OperationId}", operationId);
+        logger.LogInformation(
+            "Запрос на получение стауса операции {@OperationInfo}", 
+            new {operationId});
+        
         var operation = await operationRepository.GetByOperationIdAsync(operationId, cancellationToken);
 
         if (operation == null)
         {
-            logger.LogWarning("--- Операции не найдена: {OperationId}", operationId);
+            logger.LogWarning(
+                "Операция {@OperationInfo} не найдена", 
+                new {operationId});
+            
             throw new NotFoundException($"Операция {operationId} не найдена.");
         }
-        logger.LogInformation("--- Cтатус операции {OperationId}: {Status}", operationId, operation.Status);
+        logger.LogInformation(
+            "Cтатус операции {@OperationInfo}", 
+            new { operationId, operation.Status });
         
         return MapToResponse(operation);
     }
@@ -96,15 +153,19 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         // операции не существует
         if (operation == null)
         {
-            logger.LogWarning("--- Операция {OperationId} не найдена для пришедшей квитанции", receipt.OperationId);
+            logger.LogWarning(
+                "Операция {@OperationInfo} не найдена для пришедшей квитанции",
+                new {receipt.OperationId});
+            
             throw new NotFoundException($"Операция {receipt.OperationId} не найдена");
         }
 
         // в операции уже есть ProviderPaymentId, а ProviderPaymentId из квитанции несоответстует
         if (operation.ProviderPaymentId != null && operation.ProviderPaymentId != receipt.ProviderPaymentId)
         {
-            logger.LogWarning("--- ProviderPaymentId несоответствует для {OperationId}: stored={Stored}, received={Received}",
-                receipt.OperationId, operation.ProviderPaymentId, receipt.ProviderPaymentId);
+            logger.LogWarning(
+                "ProviderPaymentId {receipt.ProviderPaymentId} несоответствует операции. {@OperationInfo}",
+                receipt.ProviderPaymentId, new {operation.OperationId, operation.ProviderPaymentId});
             
             throw new ConflictException(
                 $"ProviderPaymentId несоответствует: {operation.ProviderPaymentId} vs {receipt.ProviderPaymentId}"
@@ -117,7 +178,9 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             operation.ProviderPaymentId = receipt.ProviderPaymentId;
             await operationRepository.UpdateOperationAsync(operation, cancellationToken);
             
-            logger.LogInformation("--- Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {OperationId}", receipt.ProviderPaymentId, receipt.OperationId);
+            logger.LogInformation(
+                "Сохранение ProviderPaymentId {ProviderPaymentId} из квитанции в операцию {@OperationInfo}", 
+                receipt.ProviderPaymentId, new {operation.OperationId, operation.ProviderPaymentId});
         }
 
         if (operation.Status == OperationStatus.COMPLETED || operation.Status == OperationStatus.REJECTED)
@@ -129,7 +192,9 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
                 operation.Status,
                 operation.Status), cancellationToken);
             
-            logger.LogWarning("--- Квитанция игнорируется, так как операция уже в финальном статусе {Status}", operation.Status);
+            logger.LogWarning(
+                "Квитанция игнорируется, так как операция уже в финальном статусе {@OperationInfo}", 
+                new {operation.OperationId, operation.Status});
             return;
         }
         
@@ -150,7 +215,9 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             receipt.Message, 
             toStatus: operation.Status), cancellationToken);
         
-        logger.LogInformation("--- Операция {OperationId} получила статус {Result}", receipt.OperationId, receipt.Result);
+        logger.LogInformation(
+            "Получен финальный статус для операции. {@OperationInfo}", 
+            new {operation.OperationId, operation.Status});
     }
 
 

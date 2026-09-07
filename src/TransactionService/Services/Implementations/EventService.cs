@@ -9,7 +9,9 @@ public class EventService(IEventRepository eventRepository, ILogger<Program> log
 {
     public async Task<List<EventResponse>> GetEventsByOperationIdAsync(string operationId, CancellationToken cancellationToken = default)
     {
-        logger.LogInformation("-- Запрос истории событий для операции: {OperationId}", operationId);
+        logger.LogInformation(
+            "Запрос истории событий для операции: {@OperationInfo}", 
+            new{OperationId = operationId});
 
         var events = await eventRepository.GetByOperationIdAsync(operationId, cancellationToken);
         
@@ -17,7 +19,10 @@ public class EventService(IEventRepository eventRepository, ILogger<Program> log
 
         if (eventsList.Count == 0)
         {
-            logger.LogWarning("--- События операции {OperationId} не найдены", operationId);
+            logger.LogWarning(
+                "События операции {@OperationInfo} не найдены", 
+                new{OperationId = operationId});
+            
             throw new NotFoundException($"События операции {operationId} не найдены.");
         }
          
@@ -30,7 +35,9 @@ public class EventService(IEventRepository eventRepository, ILogger<Program> log
             Message = e.Message,
             OccurredAt = e.OccurredAt.ToString("O")
         }).ToList();
-        logger.LogInformation("-- Найдено {Count} событий для операции {OperationId}", eventResponses.Count, operationId);
+        logger.LogInformation(
+            "Найдено {Count} событий для операции {@OperationInfo}", 
+            eventResponses.Count, new{OperationId = operationId});
         
         return eventResponses;
     }
