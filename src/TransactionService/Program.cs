@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using OpenTelemetry.Metrics;
 using TransactionService.Background;
 using TransactionService.Data;
 using TransactionService.Data.DTOs;
@@ -23,6 +24,12 @@ builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
 builder.Services.AddSingleton<ApplicationMetrics>();
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddMeter("TransactionService");
+        metrics.AddPrometheusExporter();
+    });
 
 builder.Services.AddDataAccess(builder.Configuration);
 builder.Services.AddApplicationServices();
@@ -38,6 +45,8 @@ builder.Services.AddHttpClient<IProviderService, ProviderService>(client =>
 });
 
 var app = builder.Build();
+
+app.UseOpenTelemetryPrometheusScrapingEndpoint();
 
 using (var scope = app.Services.CreateScope())
 {
