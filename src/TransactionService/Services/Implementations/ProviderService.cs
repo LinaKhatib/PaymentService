@@ -2,10 +2,11 @@
 using System.Text.Json;
 using TransactionService.Data.DTOs;
 using TransactionService.Exceptions;
+using TransactionService.Metrics;
 
 namespace TransactionService.Services;
 
-public class ProviderService(ILogger<OperationService> logger, HttpClient httpClient) : IProviderService
+public class ProviderService(ILogger<ProviderService> logger, HttpClient httpClient, ApplicationMetrics metrics) : IProviderService
 {
     public async Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency, CancellationToken cancellationToken = default)
     {
@@ -96,6 +97,8 @@ public class ProviderService(ILogger<OperationService> logger, HttpClient httpCl
             } 
             
             retryCount++;
+            
+            metrics.RecordRetry();
                 
             if (retryCount >= maxRetries)
             {

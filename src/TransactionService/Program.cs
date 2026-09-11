@@ -6,6 +6,7 @@ using TransactionService.Exceptions;
 using TransactionService.Extensions;
 using TransactionService.Services;
 using Serilog;
+using TransactionService.Metrics;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,6 +21,8 @@ builder.Host.UseSerilog();
 
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
+
+builder.Services.AddSingleton<ApplicationMetrics>();
 
 builder.Services.AddDataAccess(builder.Configuration);
 builder.Services.AddApplicationServices();

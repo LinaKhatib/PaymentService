@@ -1,11 +1,12 @@
 ﻿using TransactionService.Data.Interfaces;
+using TransactionService.Metrics;
 using TransactionService.Models;
 using TransactionService.Models.Enums;
 using TransactionService.Services;
 
 namespace TransactionService.Background;
 
-public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger<PaymentBackgroundService> logger) : BackgroundService
+public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger<PaymentBackgroundService> logger, ApplicationMetrics metrics) : BackgroundService
 {
     private const int MAX_RETRIES = 3; 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -45,6 +46,8 @@ public class PaymentBackgroundService(IServiceScopeFactory scopeFactory, ILogger
                 operation.Status = OperationStatus.FAILED;
                 await operationRepository.UpdateOperationAsync(operation, cancellationToken);
 
+                metrics.DecrementPending();
+                
                 await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
                     operation,
                     EventType.FAILED,

@@ -1,12 +1,13 @@
 ﻿using TransactionService.Data.DTOs;
 using TransactionService.Data.Interfaces;
 using TransactionService.Exceptions;
+using TransactionService.Metrics;
 using TransactionService.Models;
 using TransactionService.Models.Enums;
 
 namespace TransactionService.Services;
 
-public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, ILogger<OperationService> logger, IEventFactory eventFactory) : IOperationService
+public class OperationService(IOperationRepository operationRepository, IEventRepository eventRepository, ILogger<OperationService> logger, IEventFactory eventFactory, ApplicationMetrics metrics) : IOperationService
 {
     public async Task<OperationResponse> CreateOperationAsync(OperationRequest request, CancellationToken cancellationToken = default)
     {
@@ -120,6 +121,8 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
                 newEvent.OccurredAt
             });
         
+        metrics.IncrementPending();
+        
         return (MapToResponse(operation), true);
     }
 
@@ -209,6 +212,8 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
         operation.Status = newStatus; 
         await operationRepository.UpdateOperationAsync(operation, cancellationToken);
 
+        metrics.DecrementPending();
+        
         await eventRepository.AddEventAsync(eventFactory.CreateEventAsync(
             operation, 
             eventType, 
