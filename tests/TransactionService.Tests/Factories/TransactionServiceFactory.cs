@@ -3,45 +3,54 @@ using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using TransactionService.Data;
+using TransactionService.Services;
+using TransactionService.Tests.Fakes;
 
 namespace TransactionService.Tests.Factories;
 
 public class TransactionServiceFactory : WebApplicationFactory<Program>
 {
+    public FakeProviderService FakeProvider { get; } = new();
     private SqliteConnection? _connection;
-    
+    private IServiceScope? _scope;
+    public bool DisableBackgroundService { get; set; } = false;
+
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         builder.UseEnvironment("Testing");
 
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.SingleOrDefault(
-                d => d.ServiceType == typeof(DbContextOptions<PaymentDbContext>));
+            services.RemoveAll<DbContextOptions<PaymentDbContext>>();
+            services.RemoveAll<DbContextOptions>();
+            services.RemoveAll<PaymentDbContext>();
 
-            if (descriptor != null)
-            {
-                services.Remove(descriptor);
-            }
             
             _connection = new SqliteConnection("DataSource=:memory:");
             _connection.Open();
 
-            services.AddDbContext<PaymentDbContext>(options =>
-            {
-                options.UseSqlite(_connection);
-            });
+            services.AddDbContext<PaymentDbContext>(options => options.UseSqlite(_connection));
+            services.RemoveAll<IProviderService>();
+            services.AddSingleton<IProviderService>(FakeProvider);
             
-            using var scope = services.BuildServiceProvider().CreateScope();
-            var dbContext = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
-            dbContext.Database.Migrate();
+            if (DisableBackgroundService) services.RemoveAll<IHostedService>(); 
         });
     }
-
-    protected override void Dispose(bool builder)
+    
+    public async Task InitializeAsync()
     {
-        base.Dispose(builder);
+        _scope = Services.CreateScope();
+        var dbcontext = _scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
+        await dbcontext.Database.MigrateAsync();
+    }
+
+    public new async Task DisposeAsync()
+    {
+        _scope?.Dispose();
         _connection?.Dispose();
+        await base.DisposeAsync();
     }
 }

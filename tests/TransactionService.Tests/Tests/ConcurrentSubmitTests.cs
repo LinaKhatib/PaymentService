@@ -5,24 +5,23 @@ using TransactionService.Data;
 using TransactionService.Models;
 using TransactionService.Models.Enums;
 using TransactionService.Tests.Factories;
-using OperationStatus = System.Buffers.OperationStatus;
 
 namespace TransactionService.Tests.Tests;
 
-public class ConcurrentSubmitTests : IClassFixture<TransactionServiceFactory>
+public class ConcurrentSubmitTests 
 {
-    private readonly TransactionServiceFactory _factory;
-    private readonly HttpClient _client;
-    
-    public ConcurrentSubmitTests(TransactionServiceFactory factory)
-    {
-        _factory = factory;
-        _client = factory.CreateClient();
-    }
-
     [Fact]
     public async Task Submit_ConcurrentRequests_OnlyOneCreatesIntent()
     {
+        await using var factory = new TransactionServiceFactory
+        {
+            DisableBackgroundService = true
+        };
+        
+        await factory.InitializeAsync();
+
+        var client = factory.CreateClient();
+
         var operationId = $"concurrent-{Guid.NewGuid()}";
 
         var createRequest = new
@@ -33,11 +32,11 @@ public class ConcurrentSubmitTests : IClassFixture<TransactionServiceFactory>
             description = "Concurrent test",
         };
 
-        var createResponse = await _client.PostAsJsonAsync("/operations", createRequest);
+        var createResponse = await client.PostAsJsonAsync("/operations", createRequest);
         Assert.Equal(HttpStatusCode.Created, createResponse.StatusCode);
 
         var tasks = Enumerable.Range(0, 5)
-            .Select(_ => _client.PostAsync($"/operations/{operationId}/submit", null))
+            .Select(_ => client.PostAsync($"/operations/{operationId}/submit", null))
             .ToList();
 
         var responses = await Task.WhenAll(tasks);
@@ -47,7 +46,7 @@ public class ConcurrentSubmitTests : IClassFixture<TransactionServiceFactory>
         Assert.All(statusCode, code =>
                 Assert.True(code == 200 || code == 202, $"Нежиданный код: {code}"));
 
-        using var scope = _factory.Services.CreateScope();
+        using var scope = factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<PaymentDbContext>();
 
         var operation = dbContext.Operations
