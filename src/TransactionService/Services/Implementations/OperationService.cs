@@ -89,13 +89,18 @@ public class OperationService(IOperationRepository operationRepository, IEventRe
             throw new NotFoundException($"Операция {operationId} не найдена.");
         }
 
-        if (operation.Status != OperationStatus.CREATED)
+        var transitioned = await operationRepository.TryTransitionToProcessingAsync(
+            operationId, cancellationToken);
+
+        if (!transitioned)
         {
             logger.LogInformation(
                 "Запрос провайдеру на создание операции {@OperationInfo} ранее уже был отправлен", 
                 new {operationId});
             
-            return (MapToResponse(operation), false);
+            var current = await operationRepository.GetByOperationIdAsync(operationId, cancellationToken);
+
+            return (MapToResponse(current!), false);
         }
         
         operation.Status = OperationStatus.PROCESSING;

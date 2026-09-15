@@ -9,4 +9,5 @@ public interface IOperationRepository
     Task UpdateOperationAsync(Operation operation, CancellationToken cancellationToken = default);
     Task<bool> ExistsOperationAsync(string operationId, CancellationToken cancellationToken = default);
     Task<IEnumerable<Operation>> GetProcessingOperationsAsync(CancellationToken cancellationToken);
+    Task<bool> TryTransitionToProcessingAsync(string operationId, CancellationToken cancellationToken = default);
 }

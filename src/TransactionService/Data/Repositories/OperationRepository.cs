@@ -57,4 +57,14 @@ public class OperationRepository(PaymentDbContext context, ILogger<OperationRepo
             .Where(o => o.Status == OperationStatus.PROCESSING)
             .ToListAsync(cancellationToken);
     }
+
+    public async Task<bool> TryTransitionToProcessingAsync(string operationId, CancellationToken cancellationToken = default)
+    {
+        var affected = await context.Operations
+            .Where(o => o.OperationId == operationId && o.Status == OperationStatus.CREATED)
+            .ExecuteUpdateAsync(s => s
+                    .SetProperty(o => o.Status, OperationStatus.PROCESSING), cancellationToken);
+
+        return affected > 0;
+    }
 }

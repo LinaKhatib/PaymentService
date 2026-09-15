@@ -222,3 +222,5 @@ app.MapPost("/receipts", async (ReceiptRequest receipt, IOperationService servic
 });
 
 app.Run();
+
+public partial class Program { }
