@@ -7,6 +7,8 @@ public class FakeProviderService : IProviderService
 {
     public bool ShouldFail { get; set; } = true;
     public int CallCount { get; private  set; }
+    
+    public string? LastProviderPaymentId { get; private set; }
     public Task<ProviderResponse> SendPaymentAsync(string operationId, string amount, string currency,
         CancellationToken cancellationToken = default)
     {
@@ -17,9 +19,11 @@ public class FakeProviderService : IProviderService
             throw new HttpRequestException("Service Unavailable (503)");
         }
 
+        LastProviderPaymentId = $"fake-{Guid.NewGuid()}";
+        
         return Task.FromResult(new ProviderResponse
             {
-                ProviderPaymentId = $"fake-{Guid.NewGuid()}",
+                ProviderPaymentId = LastProviderPaymentId,
                 Status = "ACCEPTED"
             });
     }
