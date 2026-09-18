@@ -1,0 +1,22 @@
+services:
+  payment-service:
+    build: .
+    environment:
+      PROVIDER_URL: http://provider-simulator:8081
+      ASPNETCORE_URLS: http://+:8080
+      ConnectionStrings__DefaultConnection: "Data Source=/data/payments.db;Cache=Shared"
+    ports:
+      - "8080:8080"
+    volumes:
+      - payment-data:/data
+
+  provider-simulator:
+    image: ghcr.io/fintech-dev-lab/internship-provider-simulator:v0.2.0
+    environment:
+      CALLBACK_URL: http://payment-service:8080/receipts
+    ports:
+      - "8081:8081"
+
+
+volumes:
+  payment-data:

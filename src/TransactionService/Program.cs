@@ -44,6 +44,8 @@ builder.Services.AddHttpClient<IProviderService, ProviderService>(client =>
     client.DefaultRequestHeaders.Accept.Add(new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/json"));
 });
 
+builder.WebHost.UseUrls("http://+:8080");
+
 var app = builder.Build();
 
 app.UseOpenTelemetryPrometheusScrapingEndpoint();
